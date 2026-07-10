@@ -28,15 +28,11 @@ namespace Parallax
             Texture2D inflPacked = BuildPacked(byCh, H, l => l == null ? null : l.influencePath, SCALAR_SIZE);
             Texture2D aoPacked = BuildPacked(byCh, H, l => l == null ? null : l.occlusionPath, SCALAR_SIZE);
 
-            string cache = Path.Combine(KSPUtil.ApplicationRootPath,
-                "GameData/ParallaxContinued/PluginData/BiomeMasks", body.planetName + "_layers.png");
-
             body.biomeAlbedoArr = albedoArr;
             body.biomeBumpArr = bumpArr;
             body.biomeDispPacked = dispPacked;
             body.biomeInflPacked = inflPacked;
             body.biomeAoPacked = aoPacked;
-            body.biomeMask = mask;
 
             body.biomeTilingLive = Param(byCh, l => l.tiling, 0.03f);
             body.biomeDispScaleLive = Param(byCh, l => l.displacementScale, 0f);
@@ -44,10 +40,6 @@ namespace Parallax
             body.biomeBumpScaleLive = Param(byCh, l => l.bumpScale, 1f);
             body.biomeAoStrengthLive = Param(byCh, l => l.occlusionStrength, 0f);
             body.biomeEdgeNoiseLive = 0f;
-
-            Color[] px = mask.GetPixels();
-            int nonzero = 0; for (int i = 0; i < px.Length; i++) if (px[i].r > 0.5f) nonzero++;
-            ParallaxDebug.Log("[BiomeLayer] mask red>0.5 pixels: " + nonzero + " / " + px.Length);
 
             foreach (Material m in Variants(body.parallaxMaterials))
             {

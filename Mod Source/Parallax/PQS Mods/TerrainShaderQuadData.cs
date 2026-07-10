@@ -61,7 +61,7 @@ namespace Parallax
 
             quadMaterial = DetermineMaterial();
 
-            if (body.HasBiomeLayers && body.biomeMask != null && !quadMaterial.IsKeywordEnabled("BIOME_LAYER"))
+            if (body.HasBiomeLayers && !quadMaterial.IsKeywordEnabled("BIOME_LAYER"))
             {
                 quadMaterial.EnableKeyword("BIOME_LAYER");
                 quadMaterial.SetTexture("_BiomeAlbedoArray", body.biomeAlbedoArr);

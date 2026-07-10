@@ -229,7 +229,6 @@ namespace Parallax
         public Texture2D biomeDispPacked;
         public Texture2D biomeInflPacked;
         public Texture2D biomeAoPacked;
-        public Texture2D biomeMask;
 
         public bool HasBiomeLayers
         {
