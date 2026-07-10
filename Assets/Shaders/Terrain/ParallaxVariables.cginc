@@ -84,3 +84,18 @@ float _LowMidBlendEnd;
 
 float _MidHighBlendStart;
 float _MidHighBlendEnd;
+
+// --- biome layer ---
+Texture2DArray _BiomeAlbedoArray;
+SamplerState sampler_TrilinearRepeat;
+Texture2DArray _BiomeBumpArray;
+Texture2D _BiomeDisplacementPacked;
+Texture2D _BiomeInfluencePacked;
+Texture2D _BiomeOcclusionPacked;
+float4 _BiomeQuadMask;
+float _BiomeTiling[4];
+float _BiomeDisplacementScale[4];
+float _BiomeInfluenceStrength[4];
+float _BiomeBumpScale[4];
+float _BiomeOcclusionStrength[4];
+float _BiomeEdgeNoise;

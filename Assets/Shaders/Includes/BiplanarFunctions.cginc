@@ -186,3 +186,122 @@ NORMAL_FLOAT SampleBiplanarNormal(sampler2D tex, PixelBiplanarParams params, flo
     
     return result;
 }
+
+// =================== BIOME LAYER===================
+#define TEX2DARRAY_GRAD_COORDS_LEVEL0(axis, params, coords, slice, t) \
+    float3(coords[axis.y]*t, coords[axis.z]*t, slice), \
+    float2(params.dpdx0[axis.y]*t, params.dpdx0[axis.z]*t), \
+    float2(params.dpdy0[axis.y]*t, params.dpdy0[axis.z]*t)
+#define TEX2DARRAY_GRAD_COORDS_LEVEL1(axis, params, coords, slice, t) \
+    float3(coords[axis.y]*t, coords[axis.z]*t, slice), \
+    float2(params.dpdx1[axis.y]*t, params.dpdx1[axis.z]*t), \
+    float2(params.dpdy1[axis.y]*t, params.dpdy1[axis.z]*t)
+
+#define TEX2DOBJ_GRAD_COORDS_LEVEL0(axis, params, coords) \
+    float2(coords[axis.y], coords[axis.z]), \
+    float2(params.dpdx0[axis.y], params.dpdx0[axis.z]), \
+    float2(params.dpdy0[axis.y], params.dpdy0[axis.z])
+#define TEX2DOBJ_GRAD_COORDS_LEVEL1(axis, params, coords) \
+    float2(coords[axis.y], coords[axis.z]), \
+    float2(params.dpdx1[axis.y], params.dpdx1[axis.z]), \
+    float2(params.dpdy1[axis.y], params.dpdy1[axis.z])
+#define TEX2DOBJ_LOD_COORDS(axis, coords) float2(coords[axis.y], coords[axis.z])
+
+float4 SampleBiplanarTextureObj(Texture2D tex, SamplerState samp, PixelBiplanarParams params, float3 worldPos0, float3 worldPos1, float3 worldNormal, float blend)
+{
+    float4 x0 = tex.SampleGrad(samp, TEX2DOBJ_GRAD_COORDS_LEVEL0(params.ma, params, worldPos0));
+    float4 y0 = tex.SampleGrad(samp, TEX2DOBJ_GRAD_COORDS_LEVEL0(params.me, params, worldPos0));
+    float4 x1 = tex.SampleGrad(samp, TEX2DOBJ_GRAD_COORDS_LEVEL1(params.ma, params, worldPos1));
+    float4 y1 = tex.SampleGrad(samp, TEX2DOBJ_GRAD_COORDS_LEVEL1(params.me, params, worldPos1));
+
+    float4 x = lerp(x0, x1, blend);
+    float4 y = lerp(y0, y1, blend);
+
+    float2 w = float2(params.absWorldNormal[params.ma.x], params.absWorldNormal[params.me.x]);
+    w = saturate(w * 2.365744f - 1.365744f);
+    w = pow(w, params.blend * 0.125f);
+
+    return (x * w.x + y * w.y) / (w.x + w.y);
+}
+
+float4 SampleBiplanarTextureLODObj(Texture2D tex, SamplerState samp, VertexBiplanarParams params, float3 worldPos0, float3 worldPos1, float3 worldNormal, float blend)
+{
+    float4 x0 = tex.SampleLevel(samp, TEX2DOBJ_LOD_COORDS(params.ma, worldPos0), 0);
+    float4 y0 = tex.SampleLevel(samp, TEX2DOBJ_LOD_COORDS(params.me, worldPos0), 0);
+    float4 x1 = tex.SampleLevel(samp, TEX2DOBJ_LOD_COORDS(params.ma, worldPos1), 0);
+    float4 y1 = tex.SampleLevel(samp, TEX2DOBJ_LOD_COORDS(params.me, worldPos1), 0);
+
+    float4 x = lerp(x0, x1, blend);
+    float4 y = lerp(y0, y1, blend);
+
+    float2 w = float2(params.absWorldNormal[params.ma.x], params.absWorldNormal[params.me.x]);
+    w = saturate(w * 2.365744f - 1.365744f);
+    w = pow(w, params.blend * 0.125f);
+
+    return (x * w.x + y * w.y) / (w.x + w.y);
+}
+
+float4 SampleBiplanarArray(Texture2DArray tex, SamplerState samp, float slice, float t, PixelBiplanarParams params, float3 worldPos0, float3 worldPos1, float3 worldNormal, float blend)
+{
+    float4 x0 = tex.SampleGrad(samp, TEX2DARRAY_GRAD_COORDS_LEVEL0(params.ma, params, worldPos0, slice, t));
+    float4 y0 = tex.SampleGrad(samp, TEX2DARRAY_GRAD_COORDS_LEVEL0(params.me, params, worldPos0, slice, t));
+    float4 x1 = tex.SampleGrad(samp, TEX2DARRAY_GRAD_COORDS_LEVEL1(params.ma, params, worldPos1, slice, t));
+    float4 y1 = tex.SampleGrad(samp, TEX2DARRAY_GRAD_COORDS_LEVEL1(params.me, params, worldPos1, slice, t));
+
+    float4 x = lerp(x0, x1, blend);
+    float4 y = lerp(y0, y1, blend);
+
+    float2 w = float2(params.absWorldNormal[params.ma.x], params.absWorldNormal[params.me.x]);
+    w = saturate(w * 2.365744f - 1.365744f);
+    w = pow(w, params.blend * 0.125f);
+
+    return (x * w.x + y * w.y) / (w.x + w.y);
+}
+
+NORMAL_FLOAT SampleBiplanarArrayNormal(Texture2DArray tex, SamplerState samp, float slice, float t, float bumpScale, PixelBiplanarParams params, float3 worldPos0, float3 worldPos1, float3 worldNormal, float blend)
+{
+    float4 texLevel0x = tex.SampleGrad(samp, TEX2DARRAY_GRAD_COORDS_LEVEL0(params.ma, params, worldPos0, slice, t));
+    float4 texLevel0y = tex.SampleGrad(samp, TEX2DARRAY_GRAD_COORDS_LEVEL0(params.me, params, worldPos0, slice, t));
+    float4 texLevel1x = tex.SampleGrad(samp, TEX2DARRAY_GRAD_COORDS_LEVEL1(params.ma, params, worldPos1, slice, t));
+    float4 texLevel1y = tex.SampleGrad(samp, TEX2DARRAY_GRAD_COORDS_LEVEL1(params.me, params, worldPos1, slice, t));
+
+    NORMAL_FLOAT x0 = ParallaxUnpackNormalEmission(texLevel0x);
+    NORMAL_FLOAT y0 = ParallaxUnpackNormalEmission(texLevel0y);
+    NORMAL_FLOAT x1 = ParallaxUnpackNormalEmission(texLevel1x);
+    NORMAL_FLOAT y1 = ParallaxUnpackNormalEmission(texLevel1y);
+
+    NORMAL_FLOAT x = lerp(x0, x1, blend);
+    NORMAL_FLOAT y = lerp(y0, y1, blend);
+
+    x.xyz *= bumpScale;
+    y.xyz *= bumpScale;
+
+    x.xyz = normalize(float3(x.y + worldNormal[params.ma.z], x.x + worldNormal[params.ma.y], worldNormal[params.ma.x]));
+    y.xyz = normalize(float3(y.y + worldNormal[params.me.z], y.x + worldNormal[params.me.y], worldNormal[params.me.x]));
+
+    x.xyz = float3(x[params.ma.z], x[params.ma.y], x[params.ma.x]);
+    y.xyz = float3(y[params.me.z], y[params.me.y], y[params.me.x]);
+
+    float2 w = float2(params.absWorldNormal[params.ma.x], params.absWorldNormal[params.me.x]);
+    w = saturate(w * 2.365744f - 1.365744f);
+    w = pow(w, params.blend * 0.125f);
+
+    NORMAL_FLOAT result = (x * w.x + y * w.y) / (w.x + w.y);
+    return result;
+}
+float BiomeHash(float2 p)
+{
+    return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
+}
+float BiomeValueNoise(float2 p)
+{
+    float2 i = floor(p);
+    float2 f = frac(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = BiomeHash(i + float2(0.0, 0.0));
+    float b = BiomeHash(i + float2(1.0, 0.0));
+    float c = BiomeHash(i + float2(0.0, 1.0));
+    float d = BiomeHash(i + float2(1.0, 1.0));
+    return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
+}
+// ===================================================================================

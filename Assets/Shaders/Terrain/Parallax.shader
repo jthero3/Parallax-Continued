@@ -37,6 +37,13 @@ Shader "Custom/Parallax"
         _DisplacementMap("Displacement Map", 2D) = "black" {}
         _OcclusionMap("Occlusion Map", 2D) = "white" {}
 
+        [Header(Biome Layer)]
+        _BiomeAlbedoArray("Biome Albedo Array", 2DArray) = "" {}
+        _BiomeBumpArray("Biome Bump Array", 2DArray) = "" {}
+        _BiomeDisplacementPacked("Biome Displacement (RGBA)", 2D) = "black" {}
+        _BiomeInfluencePacked("Biome Influence (RGBA)", 2D) = "white" {}
+        _BiomeOcclusionPacked("Biome Occlusion (RGBA)", 2D) = "white" {}
+
         [Space(10)]
         [Header(Texture Parameters)]
         [Space(10)]
@@ -95,6 +102,7 @@ Shader "Custom/Parallax"
             // I would move this to ParallaxStructs.cginc but as we're on unity 2019 you can't have preprocessor directives in cgincludes. Sigh
             #pragma multi_compile_local            PARALLAX_SINGLE_LOW PARALLAX_SINGLE_MID PARALLAX_SINGLE_HIGH PARALLAX_DOUBLE_LOWMID PARALLAX_DOUBLE_MIDHIGH PARALLAX_FULL
             #pragma multi_compile_local _          INFLUENCE_MAPPING
+            #pragma multi_compile _                BIOME_LAYER
             #pragma multi_compile_local _          ADVANCED_BLENDING
             #pragma multi_compile_local _          EMISSION
             #pragma multi_compile_fog
@@ -272,6 +280,38 @@ Shader "Custom/Parallax"
 
                 fixed4 altitudeDiffuse = BLEND_TEXTURES(landMask, lowDiffuse, midDiffuse, highDiffuse);
                 NORMAL_FLOAT altitudeNormal = BLEND_TEXTURES(landMask, lowNormal, midNormal, highNormal);
+    
+                #if defined (BIOME_LAYER) 
+                    uint _bw, _bh; _BiomeMask.GetDimensions(_bw, _bh);
+                    int2 _bpx = int2(saturate(BiomeMaskUV(i.worldPos)) * float2(_bw - 1, _bh - 1));
+
+                    float4 texMask  = _BiomeMask.Load(int3(_bpx, 0));
+                    float4 bMask    = texMask * ceil(saturate(_BiomeQuadMask));
+
+                    #if defined (INFLUENCE_MAPPING)
+                        float4 bInf = SampleBiplanarTextureObj(_BiomeInfluencePacked, sampler_TrilinearRepeat , params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+                    #endif
+
+                    [unroll] for (int bi = 0; bi < 4; bi++)
+                    {
+                        float wgt = bMask[bi];
+                        if (wgt <= 0.0) continue;
+
+                        float s = (float)bi;
+                        float t = _BiomeTiling[bi] / _Tiling;
+                        fixed4 bDiff = SampleBiplanarArray(_BiomeAlbedoArray, sampler_TrilinearRepeat , s, t, params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+                        NORMAL_FLOAT bNorm = SampleBiplanarArrayNormal(_BiomeBumpArray, sampler_TrilinearRepeat , s, t, _BiomeBumpScale[bi], params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+
+                        #if defined (INFLUENCE_MAPPING)
+                            float inf = bInf[bi] * _BiomeInfluenceStrength[bi];
+                            float lum = (bDiff.r * 0.21f + bDiff.g * 0.72f + bDiff.b * 0.07f) + 0.5f;
+                            bDiff.rgb = lerp(vertexColor * lum, bDiff.rgb, inf);
+                        #endif
+
+                        altitudeDiffuse = lerp(altitudeDiffuse, bDiff, wgt);
+                        altitudeNormal  = lerp(altitudeNormal,  bNorm, wgt);
+                    }
+                #endif
 
                 fixed4 finalDiffuse = lerp(altitudeDiffuse, steepDiffuse, landMask.b);
                 NORMAL_FLOAT finalNormal = lerp(altitudeNormal, steepNormal, landMask.b); 
@@ -417,6 +457,7 @@ Shader "Custom/Parallax"
         
             #pragma multi_compile_local           PARALLAX_SINGLE_LOW PARALLAX_SINGLE_MID PARALLAX_SINGLE_HIGH PARALLAX_DOUBLE_LOWMID PARALLAX_DOUBLE_MIDHIGH PARALLAX_FULL
             #pragma multi_compile_local _         INFLUENCE_MAPPING
+            #pragma multi_compile _               BIOME_LAYER
             #pragma multi_compile_fog
             #pragma multi_compile_fwdadd_fullshadows
         
@@ -594,6 +635,38 @@ Shader "Custom/Parallax"
 
                 fixed4 altitudeDiffuse = BLEND_TEXTURES(landMask, lowDiffuse, midDiffuse, highDiffuse);
                 float3 altitudeNormal = BLEND_TEXTURES(landMask, lowNormal, midNormal, highNormal);
+    
+                #if defined (BIOME_LAYER) 
+                    uint _bw, _bh; _BiomeMask.GetDimensions(_bw, _bh);
+                    int2 _bpx = int2(saturate(BiomeMaskUV(i.worldPos)) * float2(_bw - 1, _bh - 1));
+
+                    float4 texMask  = _BiomeMask.Load(int3(_bpx, 0));
+                    float4 bMask    = texMask * ceil(saturate(_BiomeQuadMask));
+
+                    #if defined (INFLUENCE_MAPPING)
+                        float4 bInf = SampleBiplanarTextureObj(_BiomeInfluencePacked, sampler_TrilinearRepeat , params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+                    #endif
+
+                    [unroll] for (int bi = 0; bi < 4; bi++)
+                    {
+                        float wgt = bMask[bi];
+                        if (wgt <= 0.0) continue;
+
+                        float s = (float)bi;
+                        float t = _BiomeTiling[bi] / _Tiling;
+                        fixed4 bDiff = SampleBiplanarArray(_BiomeAlbedoArray, sampler_TrilinearRepeat , s, t, params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+                        NORMAL_FLOAT bNorm = SampleBiplanarArrayNormal(_BiomeBumpArray, sampler_TrilinearRepeat , s, t, _BiomeBumpScale[bi], params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+
+                        #if defined (INFLUENCE_MAPPING)
+                            float inf = bInf[bi] * _BiomeInfluenceStrength[bi];
+                            float lum = (bDiff.r * 0.21f + bDiff.g * 0.72f + bDiff.b * 0.07f) + 0.5f;
+                            bDiff.rgb = lerp(vertexColor * lum, bDiff.rgb, inf);
+                        #endif
+
+                        altitudeDiffuse = lerp(altitudeDiffuse, bDiff, wgt);
+                        altitudeNormal  = lerp(altitudeNormal,  bNorm, wgt);
+                    }
+                #endif
 
                 fixed4 finalDiffuse = lerp(altitudeDiffuse, steepDiffuse, landMask.b);
                 float3 finalNormal = lerp(altitudeNormal, steepNormal, landMask.b); 
@@ -634,6 +707,7 @@ Shader "Custom/Parallax"
             // I would move this to ParallaxStructs.cginc but as we're on unity 2019 you can't have preprocessor directives in cgincludes. Sigh
             #pragma multi_compile_local            PARALLAX_SINGLE_LOW PARALLAX_SINGLE_MID PARALLAX_SINGLE_HIGH PARALLAX_DOUBLE_LOWMID PARALLAX_DOUBLE_MIDHIGH PARALLAX_FULL
             #pragma multi_compile_local _          INFLUENCE_MAPPING
+            #pragma multi_compile _                BIOME_LAYER
             #pragma multi_compile_local _          EMISSION
             #pragma multi_compile_local _          ADVANCED_BLENDING
             #pragma multi_compile_local _          AMBIENT_OCCLUSION
@@ -681,6 +755,7 @@ Shader "Custom/Parallax"
                 o.worldNormal = normalize(mul(unity_ObjectToWorld, v.normal).xyz);
                 o.viewDir = _WorldSpaceCameraPos - o.worldPos;
                 o.color = v.color;
+                o.biomeWeights = v.biomeWeights;
                 o.landMask = GetLandMask(o.worldPos, o.worldNormal);
                 return o;
             }
@@ -724,6 +799,7 @@ Shader "Custom/Parallax"
                 o.worldNormal = normalize(BARYCENTRIC_INTERPOLATE(worldNormal));
                 o.viewDir = BARYCENTRIC_INTERPOLATE(viewDir);
                 o.color = BARYCENTRIC_INTERPOLATE(color);
+                o.biomeWeights = BARYCENTRIC_INTERPOLATE(biomeWeights);
                 float4 landMask = BARYCENTRIC_INTERPOLATE(landMask);
 
                 float terrainDistance = length(o.viewDir);
@@ -793,8 +869,42 @@ Shader "Custom/Parallax"
                 fixed4 altitudeDiffuse = BLEND_TEXTURES(landMask, lowDiffuse, midDiffuse, highDiffuse);
                 NORMAL_FLOAT altitudeNormal = BLEND_TEXTURES(landMask, lowNormal, midNormal, highNormal);
 
+                float4 bMask = float4(0,0,0,0);
+                float4 bInf = float4(0,0,0,0);
+                #if defined (BIOME_LAYER)
+                    bMask = i.biomeWeights;
+
+                    #if defined (INFLUENCE_MAPPING)
+                        bInf = SampleBiplanarTextureObj(_BiomeInfluencePacked, sampler_TrilinearRepeat, params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+                    #endif
+
+                    [unroll] for (int bi = 0; bi < 4; bi++)
+                    {
+                        float wgt = bMask[bi];
+                        if (wgt <= 0.004) continue;
+                        float s = (float)bi;
+                        float t = _BiomeTiling[bi] / _Tiling;
+                        fixed4 bDiff = SampleBiplanarArray(_BiomeAlbedoArray, sampler_TrilinearRepeat, s, t, params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+                        NORMAL_FLOAT bNorm = SampleBiplanarArrayNormal(_BiomeBumpArray, sampler_TrilinearRepeat, s, t, _BiomeBumpScale[bi], params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+                        #if defined (INFLUENCE_MAPPING)
+                            float inf = bInf[bi] * _BiomeInfluenceStrength[bi];
+                            float lum = (bDiff.r * 0.21f + bDiff.g * 0.72f + bDiff.b * 0.07f) + 0.5f;
+                            bDiff.rgb = lerp(vertexColor * lum, bDiff.rgb, inf);
+                        #endif
+                        altitudeDiffuse = lerp(altitudeDiffuse, bDiff, wgt);
+                        altitudeNormal  = lerp(altitudeNormal,  bNorm, wgt);
+                    }
+                #endif
+
                 fixed4 finalDiffuse = lerp(altitudeDiffuse, steepDiffuse, landMask.b);
                 NORMAL_FLOAT finalNormal = lerp(altitudeNormal, steepNormal, landMask.b);
+
+                #if defined (BIOME_LAYER) && defined (AMBIENT_OCCLUSION)
+                    float4 bAO = SampleBiplanarTextureObj(_BiomeOcclusionPacked, sampler_TrilinearRepeat , params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+                    float biomeAO = dot(bMask, bAO * float4(_BiomeOcclusionStrength[0], _BiomeOcclusionStrength[1], _BiomeOcclusionStrength[2], _BiomeOcclusionStrength[3]));
+                    float biomeAOw = saturate(dot(bMask, float4(1,1,1,1)));
+                    occlusion = lerp(occlusion, biomeAO.xxxx, biomeAOw);
+                #endif
 
                 BLEND_OCCLUSION(landMask, occlusion)
 

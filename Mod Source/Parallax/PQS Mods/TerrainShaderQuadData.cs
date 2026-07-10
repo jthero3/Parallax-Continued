@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Profiling;
+using Kopernicus;
 
 namespace Parallax
 {
@@ -28,6 +29,10 @@ namespace Parallax
         public float subdivisionRadius;
         public bool isMaxLevel;
         public float quadWidth;
+
+        private static readonly int[] BiomeCornerIdx = { 0, 14, 224, 210, 112 };
+        private static MaterialPropertyBlock _biomeMpb;
+        private static readonly int _BiomeQuadMaskID = Shader.PropertyToID("_BiomeQuadMask");
 
         float blendLowMidStart;
         float blendLowMidEnd;
@@ -57,7 +62,23 @@ namespace Parallax
             blendMidHighEnd = body.terrainShaderProperties.shaderFloats["_MidHighBlendEnd"];
 
             quadMaterial = DetermineMaterial();
-            
+
+            if (body.HasBiomeLayers && body.biomeMask != null && !quadMaterial.IsKeywordEnabled("BIOME_LAYER"))
+            {
+                quadMaterial.EnableKeyword("BIOME_LAYER");
+                quadMaterial.SetTexture("_BiomeMask", body.biomeMask);
+                quadMaterial.SetTexture("_BiomeAlbedoArray", body.biomeAlbedoArr);
+                quadMaterial.SetTexture("_BiomeBumpArray", body.biomeBumpArr);
+                quadMaterial.SetTexture("_BiomeDisplacementPacked", body.biomeDispPacked);
+                quadMaterial.SetTexture("_BiomeInfluencePacked", body.biomeInflPacked);
+                quadMaterial.SetTexture("_BiomeOcclusionPacked", body.biomeAoPacked);
+                quadMaterial.SetFloatArray("_BiomeTiling", body.biomeTilingLive);
+                quadMaterial.SetFloatArray("_BiomeDisplacementScale", body.biomeDispScaleLive);
+                quadMaterial.SetFloatArray("_BiomeInfluenceStrength", body.biomeInflStrengthLive);
+                quadMaterial.SetFloatArray("_BiomeBumpScale", body.biomeBumpScaleLive);
+                quadMaterial.SetFloatArray("_BiomeOcclusionStrength", body.biomeAoStrengthLive);
+            }
+
             if (body.emissive)
             {
                 quadMaterial.EnableKeyword("EMISSION");
@@ -72,6 +93,7 @@ namespace Parallax
             }
 
             quadMeshRenderer = quad.gameObject.GetComponent<MeshRenderer>();
+            if (body.HasBiomeLayers) BakeBiomeVertexWeights(quad, body, quad.mesh);
 
             if (isMaxLevel)
             {
@@ -191,6 +213,7 @@ namespace Parallax
 
             fakeQuadMeshFilter.sharedMesh = mesh;
             fakeQuadMeshRenderer.sharedMaterial = quadMaterial;
+            if (body.HasBiomeLayers) BakeBiomeVertexWeights(quad, body, mesh);
 
             newQuad.SetActive(true);
 
@@ -290,6 +313,31 @@ namespace Parallax
                 subdivisionComponent.maxSubdivisionLevel = subdivisionLevel;
                 subdivisionComponent.subdivisionRange = newRadius;
             }
+        }
+        static void BakeBiomeVertexWeights(PQ quad, ParallaxTerrainBody body, Mesh targetMesh)
+        {
+            CelestialBody cb = FlightGlobals.GetBodyByName(body.planetName);
+            if (cb == null || targetMesh == null) return;
+
+            Vector3[] verts = targetMesh.vertices;
+            Transform tr = quad.gameObject.transform;
+            List<Vector4> weights = new List<Vector4>(verts.Length);
+
+            for (int n = 0; n < verts.Length; n++)
+            {
+                Vector3 wp = tr.TransformPoint(verts[n]);
+                CBAttributeMapSO.MapAttribute attr = Kopernicus.Utility.GetBiome(cb, wp);
+                Vector4 w = Vector4.zero;
+                if (attr != null && body.biomeChannelByName.TryGetValue(attr.name, out int c))
+                {
+                    if (c == 0) w.x = 1f;
+                    else if (c == 1) w.y = 1f;
+                    else if (c == 2) w.z = 1f;
+                    else w.w = 1f;
+                }
+                weights.Add(w);
+            }
+            targetMesh.SetUVs(2, weights);
         }
         public void Cleanup()
         {

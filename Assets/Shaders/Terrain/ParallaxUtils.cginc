@@ -120,6 +120,16 @@ float3 CalculatePhongPosition(float3 bary, float3 p0PositionWS, float3 p0NormalW
     displacementAndOffset = lerp(displacementAndOffset * exponent * 2, displacementAndOffset * exponent * 4, texLevelBlend);                                        \
     float3 displacedWorldPos = o.worldPos + displacementAndOffset * o.worldNormal * _DisplacementScale * displacementRange;
 
+#define CALCULATE_VERTEX_DISPLACEMENT_BIOME(o, landMask, displacementTex, biomeDisp, biomeWeight)                                                                   \
+    float displacementRange = 1 - min(1, terrainDistance / _MaxTessellationRange);                                                                                  \
+    float displacement = BLEND_CHANNELS_IN_TEX(landMask, displacementTex);                                                                                          \
+    displacement = lerp(displacement, biomeDisp, saturate(biomeWeight));                                                                                            \
+    float displacementOffset = _DisplacementOffset;                                                                                                                 \
+    displacement = lerp(displacement, displacementTex.a, landMask.b);                                                                                               \
+    float displacementAndOffset = displacement + displacementOffset;                                                                                                \
+    displacementAndOffset = lerp(displacementAndOffset * exponent * 2, displacementAndOffset * exponent * 4, texLevelBlend);                                        \
+    float3 displacedWorldPos = o.worldPos + displacementAndOffset * o.worldNormal * _DisplacementScale * displacementRange;
+
 //
 //  Ingame Calcs
 //

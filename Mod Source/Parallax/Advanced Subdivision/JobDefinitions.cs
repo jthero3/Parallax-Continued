@@ -87,6 +87,7 @@ namespace Parallax
         [ReadOnly] public NativeArray<float3> originalVerts;
         [ReadOnly] public NativeArray<float3> originalNormals;
         [ReadOnly] public NativeArray<float4> originalColors;
+        [ReadOnly] public NativeArray<float4> originalUV2;
 
         // Subdividable TRIS
         [WriteOnly] public NativeStream.Writer tris;
@@ -203,6 +204,8 @@ namespace Parallax
         [WriteOnly] public NativeArray<float3> newNormals;
         [NativeDisableContainerSafetyRestriction]
         [WriteOnly] public NativeArray<float4> newColors;
+        [NativeDisableContainerSafetyRestriction]
+        [WriteOnly] public NativeArray<float4> newUV2;
 
         [WriteOnly] public NativeStream.Writer newTris;
 
@@ -237,6 +240,10 @@ namespace Parallax
                 newColors[index1] = tri.c1;
                 newColors[index2] = tri.c2;
                 newColors[index3] = tri.c3;
+
+                newUV2[index1] = tri.uv1;
+                newUV2[index2] = tri.uv2;
+                newUV2[index3] = tri.uv3;
 
                 newTris.Write(index1);
                 newTris.Write(index2);

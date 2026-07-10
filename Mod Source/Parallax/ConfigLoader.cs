@@ -426,6 +426,39 @@ namespace Parallax
 
                     ParseNewBody(body, planetNode.GetNode("ShaderProperties"));
 
+                    foreach (ConfigNode bn in planetNode.GetNodes("BiomeLayer"))
+                    {
+                        ParallaxDebug.Log("[BiomeLayer] parsing layer for " + body.planetName);
+                        BiomeLayer bl = new BiomeLayer
+                        {
+                            biomeName = bn.GetValue("name"),
+                            channel = ParseIntOr(bn, "channel", 0),
+                            albedoPath = bn.GetValue("_BiomeTex"),
+                            bumpPath = bn.GetValue("_BiomeBumpMap"),
+                            displacementPath = bn.GetValue("_BiomeDisplacementMap"),
+                            influencePath = bn.GetValue("_BiomeInfluenceMap"),
+                            occlusionPath = bn.GetValue("_BiomeOcclusionMap"),
+                            tiling = ParseFloatOr(bn, "_BiomeTiling", 0.03f),
+                            displacementScale = ParseFloatOr(bn, "_BiomeDisplacementScale", 0f),
+                            influenceStrength = ParseFloatOr(bn, "_BiomeInfluenceStrength", 1f),
+                            bumpScale = ParseFloatOr(bn, "_BiomeBumpScale", 1f),
+                            occlusionStrength = ParseFloatOr(bn, "_BiomeOcclusionStrength", 1f),
+                            featherRadius = ParseIntOr(bn, "_Feather", 6),
+                            tolerance = ParseFloatOr(bn, "_Tolerance", 0.05f),
+                            edgeNoise = ParseFloatOr(bn, "_BiomeEdgeNoise", 0.05f),
+                        };
+
+                        if (bl.channel < 0 || bl.channel > 3)
+                            ParallaxDebug.LogError("[BiomeLayer] " + body.planetName + ": channel " + bl.channel + " out of 0..3");
+                        else if (body.biomeChannelByName.ContainsKey(bl.biomeName))
+                            ParallaxDebug.LogError("[BiomeLayer] " + body.planetName + ": duplicate biome " + bl.biomeName);
+                        else
+                        {
+                            body.biomeLayers.Add(bl);
+                            body.biomeChannelByName[bl.biomeName] = bl.channel;
+                        }
+                    }
+
                     // Parse scaled body, if present
                     ConfigNode scaledBodyNode = planetNode.GetNode("ParallaxScaledProperties");
                     if (scaledBodyNode != null)
@@ -1260,6 +1293,17 @@ namespace Parallax
 
             // Calculate the LOD1 mesh's largest bound for colliders
             scatter.sqrMeshBound = scatter.CalculateSqrLargestBound(scatter.distributionParams.lod1.modelPathOverride);
+        }
+        private static int ParseIntOr(ConfigNode n, string key, int dflt)
+        {
+            string s = n.GetValue(key);
+            return int.TryParse(s, out int v) ? v : dflt;
+        }
+        private static float ParseFloatOr(ConfigNode n, string key, float dflt)
+        {
+            string s = n.GetValue(key);
+            return float.TryParse(s, System.Globalization.NumberStyles.Float,
+                                  System.Globalization.CultureInfo.InvariantCulture, out float v) ? v : dflt;
         }
         static void ApplyCompatibilityPatches()
         {

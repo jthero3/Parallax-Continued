@@ -35,6 +35,7 @@ namespace Parallax
 
         static bool showScatterExporter = false;
         static bool showTerrainExporter = false;
+        static bool showBiomeList = false;
         static bool overwriteOnExport = false;
 
         static bool showDebug = false;
@@ -47,6 +48,7 @@ namespace Parallax
         static bool currentBodyHasScatters = false;
         static bool currentBodyHasTerrain = false;
         static bool currentBodyHasScaled = false;
+        static bool currentBodyHasBiomes = false;
 
         static ParallaxScaledBody currentScaledBody;
 
@@ -61,7 +63,8 @@ namespace Parallax
         {
             Scatter,
             Terrain,
-            Scaled
+            Scaled,
+            Biome
         }
         void Awake()
         {
@@ -141,6 +144,16 @@ namespace Parallax
             {
                 currentBodyHasScaled = false;
             }
+
+            if (ConfigLoader.parallaxTerrainBodies.ContainsKey(bodyName))
+            {
+                currentBodyHasBiomes = true;
+                possibleEditorModes.Add(GUIEditorMode.Biome);
+            }
+            else
+            {
+                currentBodyHasBiomes = false;
+            }
         }
         // Test if this body has parallax scaled
         void OnScaledBodyChanged(MapObject body)
@@ -210,6 +223,10 @@ namespace Parallax
             else if (editorMode == GUIEditorMode.Scatter)
             {
                 ScatterMenu();
+            }
+            else if (editorMode == GUIEditorMode.Biome)
+            {
+                BiomeMenu();
             }
             else if (editorMode == GUIEditorMode.Scaled)
             {

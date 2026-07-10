@@ -1,4 +1,6 @@
-﻿using Parallax.Scaled_System;
+﻿using Kopernicus.Configuration;
+using KSPTextureLoader;
+using Parallax.Scaled_System;
 using Parallax.Tools;
 using System;
 using System.Collections;
@@ -7,7 +9,6 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.Rendering;
-using KSPTextureLoader;
 
 namespace Parallax
 {
@@ -185,6 +186,23 @@ namespace Parallax
 
         public static ObjectPoolSettings Default => defaultSetting;
     }
+    public class BiomeLayer
+    {
+        public string biomeName;
+        public int channel;
+
+        public string albedoPath, bumpPath, displacementPath, influencePath, occlusionPath;
+
+        public float tiling = 0.03f;
+        public float displacementScale = 0f;
+        public float influenceStrength = 1f;
+        public float bumpScale = 1f;
+        public float occlusionStrength = 1f;
+        public float edgeNoise = 1f;
+
+        public int featherRadius = 6;
+        public float tolerance = 0.05f;
+    }
     // Stores the loaded values from the configs for each planet, except for the textures which are stored via file path
     // Textures are loaded On-Demand and stored in loadedTextures, where they are unloaded on scene change
     public class ParallaxTerrainBody
@@ -194,6 +212,32 @@ namespace Parallax
 
         // Terrain materials
         public ParallaxMaterials parallaxMaterials = new ParallaxMaterials();
+
+        // Biome
+        public System.Collections.Generic.List<BiomeLayer> biomeLayers = new System.Collections.Generic.List<BiomeLayer>();
+        public System.Collections.Generic.Dictionary<string, int> biomeChannelByName = new System.Collections.Generic.Dictionary<string, int>();
+
+        public float[] biomeTilingLive;
+        public float[] biomeDispScaleLive;
+        public float[] biomeInflStrengthLive;
+        public float[] biomeBumpScaleLive;
+        public float[] biomeAoStrengthLive;
+        public float biomeEdgeNoiseLive = 0f;
+
+        public Texture2DArray biomeAlbedoArr;
+        public Texture2DArray biomeBumpArr;
+        public Texture2D biomeDispPacked;
+        public Texture2D biomeInflPacked;
+        public Texture2D biomeAoPacked;
+        public Texture2D biomeMask;
+
+        public bool HasBiomeLayers
+        {
+            get
+            {
+                return biomeLayers != null && biomeLayers.Count > 0;
+            }
+        }
 
         public ShaderProperties terrainShaderProperties;
         public bool emissive = false;
@@ -211,6 +255,22 @@ namespace Parallax
         public ParallaxTerrainBody(string planetName)
         {
             this.planetName = planetName;
+        }
+        public void SetBiomeMaterialValues()
+        {
+            if (!HasBiomeLayers) return;
+            foreach (Material m in new[] { parallaxMaterials.parallaxLow, parallaxMaterials.parallaxMid,
+        parallaxMaterials.parallaxHigh, parallaxMaterials.parallaxLowMid,
+        parallaxMaterials.parallaxMidHigh, parallaxMaterials.parallaxFull })
+            {
+                if (m == null) continue;
+                m.SetFloatArray("_BiomeTiling", biomeTilingLive);
+                m.SetFloatArray("_BiomeDisplacementScale", biomeDispScaleLive);
+                m.SetFloatArray("_BiomeInfluenceStrength", biomeInflStrengthLive);
+                m.SetFloatArray("_BiomeBumpScale", biomeBumpScaleLive);
+                m.SetFloatArray("_BiomeOcclusionStrength", biomeAoStrengthLive);
+                m.SetFloat("_BiomeEdgeNoise", biomeEdgeNoiseLive);
+            }
         }
         public ConfigNode ToConfigNode()
         {

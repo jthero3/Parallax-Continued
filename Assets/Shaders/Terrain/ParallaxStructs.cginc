@@ -34,6 +34,7 @@
         float4 vertex : POSITION;                   \
         float3 normal : NORMAL;                     \
         float3 color : COLOR;                       \
+        float4 biomeWeights : TEXCOORD2;            \
     };
 
 #define PARALLAX_FORWARDBASE_STRUCT_CONTROL         \
@@ -45,6 +46,7 @@
         float3 viewDir : TEXCOORD1;                 \
         float3 color : COLOR;                       \
         float4 landMask : TEXCOORD3;                \
+        float4 biomeWeights : TEXCOORD6;            \
     };
 
 #define PARALLAX_FORWARDBASE_STRUCT_INTERP          \
@@ -55,6 +57,7 @@
         float3 worldNormal : NORMAL;                \
         float3 viewDir : TEXCOORD1;                 \
         float3 color : COLOR;                       \
+        float4 biomeWeights : TEXCOORD7;            \
         LIGHTING_COORDS(4, 5)                       \
         UNITY_FOG_COORDS(6)                         \
     };

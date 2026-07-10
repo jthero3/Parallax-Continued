@@ -35,6 +35,7 @@ namespace Parallax
         int planetOriginID =  Shader.PropertyToID("_PlanetOrigin");
         int shaderOffsetID =  Shader.PropertyToID("_TerrainShaderOffset");
         int planetRadiusID =  Shader.PropertyToID("_PlanetRadius");
+        int planetRotationID = Shader.PropertyToID("_PlanetRotationId");
 
         // Used in most shaders
         /// <summary>
@@ -126,6 +127,7 @@ namespace Parallax
                 Shader.SetGlobalVector(planetOriginID, FlightGlobals.currentMainBody.transform.position);
                 Shader.SetGlobalVector(shaderOffsetID, (Vector3)FloatingOrigin.TerrainShaderOffset);
                 Shader.SetGlobalFloat(planetRadiusID, (float)FlightGlobals.currentMainBody.Radius);
+                Shader.SetGlobalMatrix(planetRotationID, FlightGlobals.currentMainBody.transform.worldToLocalMatrix);
 
                 // Handle the case where we orbit a gas giant or a star
                 if (FlightGlobals.currentMainBody.pqsController != null)

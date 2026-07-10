@@ -63,6 +63,9 @@ namespace Parallax
         // Triangle readback data
         NativeArray<int> outputTriIndices;                      // Dispose after building mesh
 
+        NativeArray<float4> uv2Weights;
+        NativeArray<float4> newUV2;
+
         public Mesh mesh;
 
         int streamForeachCount = 0;
@@ -97,6 +100,14 @@ namespace Parallax
                 colors[i] = new float4(colorArray[i].r, colorArray[i].g, colorArray[i].b, colorArray[i].a);
             }
 
+            List<Vector4> uvList = new List<Vector4>();
+            mesh.GetUVs(2, uvList);
+            uv2Weights = new NativeArray<float4>(vertices.Length, Allocator.Persistent);
+            for (int i = 0; i < uv2Weights.Length; i++)
+                uv2Weights[i] = (i < uvList.Count)
+                    ? new float4(uvList[i].x, uvList[i].y, uvList[i].z, uvList[i].w)
+                    : float4.zero;
+
             triangles = new NativeArray<int>(mesh.triangles, Allocator.Persistent);
 
             storedVertTris = new NativeHashMap<float3, int>(3500, Allocator.Persistent);
@@ -128,7 +139,11 @@ namespace Parallax
                 float4 c2 = colors[index2];
                 float4 c3 = colors[index3];
 
-                SubdividableTriangle tri = new SubdividableTriangle(v1, v2, v3, n1, n2, n3, c1, c2, c3);
+                float4 uvw1 = uv2Weights[index1];
+                float4 uvw2 = uv2Weights[index2];
+                float4 uvw3 = uv2Weights[index3];
+                SubdividableTriangle tri = new SubdividableTriangle(v1, v2, v3, n1, n2, n3, c1, c2, c3, uvw1, uvw2, uvw3);
+
                 meshTriangles[i / 3] = tri;
             }
         }
@@ -183,6 +198,7 @@ namespace Parallax
                 originalVerts = vertices,
                 originalNormals = normals,
                 originalColors = colors,
+                originalUV2 = uv2Weights,
 
                 tris = trisWriter,
 
@@ -226,6 +242,7 @@ namespace Parallax
             newVerts = new NativeArray<float3>(storedVertTris.Length, Allocator.Persistent);
             newNormals = new NativeArray<float3>(storedVertTris.Length, Allocator.Persistent);
             newColors = new NativeArray<float4>(storedVertTris.Length, Allocator.Persistent);
+            newUV2 = new NativeArray<float4>(storedVertTris.Length, Allocator.Persistent);
 
             newTriangles = new NativeStream(meshTriangles.Length, Allocator.Persistent);
             newTrianglesWriter = newTriangles.AsWriter();
@@ -240,6 +257,7 @@ namespace Parallax
                 newNormals = this.newNormals,
                 newColors = this.newColors,
                 newTris = this.newTrianglesWriter,
+                newUV2 = this.newUV2,
 
                 storedVertTris = this.storedVertTris,
                 count = this.streamForeachCount
@@ -278,6 +296,12 @@ namespace Parallax
 
             mesh.SetNormals(newNormals);
             mesh.SetColors(newColors);
+
+            List<Vector4> uvOut = new List<Vector4>(newUV2.Length);
+            for (int i = 0; i < newUV2.Length; i++)
+                uvOut.Add(new Vector4(newUV2[i].x, newUV2[i].y, newUV2[i].z, newUV2[i].w));
+            mesh.SetUVs(2, uvOut);
+
             this.GetComponent<MeshFilter>().sharedMesh = mesh;
         }
         void FreePostMeshBuildResources()
@@ -306,6 +330,12 @@ namespace Parallax
 
             mesh.SetNormals(normals);
             mesh.SetColors(colors);
+
+            List<Vector4> uvReset = new List<Vector4>(uv2Weights.Length);
+            for (int i = 0; i < uv2Weights.Length; i++)
+                uvReset.Add(new Vector4(uv2Weights[i].x, uv2Weights[i].y, uv2Weights[i].z, uv2Weights[i].w));
+            mesh.SetUVs(2, uvReset);
+
             this.GetComponent<MeshFilter>().sharedMesh = mesh;
         }
         public void Cleanup()
