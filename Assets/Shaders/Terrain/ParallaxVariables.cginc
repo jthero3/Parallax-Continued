@@ -92,7 +92,6 @@ Texture2DArray _BiomeBumpArray;
 Texture2D _BiomeDisplacementPacked;
 Texture2D _BiomeInfluencePacked;
 Texture2D _BiomeOcclusionPacked;
-float4 _BiomeQuadMask;
 float _BiomeTiling[4];
 float _BiomeDisplacementScale[4];
 float _BiomeInfluenceStrength[4];

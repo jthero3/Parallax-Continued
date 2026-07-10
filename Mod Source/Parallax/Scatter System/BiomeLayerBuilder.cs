@@ -30,7 +30,6 @@ namespace Parallax
 
             string cache = Path.Combine(KSPUtil.ApplicationRootPath,
                 "GameData/ParallaxContinued/PluginData/BiomeMasks", body.planetName + "_layers.png");
-            Texture2D mask = BiomeMaskBaker.BakeRGBA(cb, byCh, cache);
 
             body.biomeAlbedoArr = albedoArr;
             body.biomeBumpArr = bumpArr;
@@ -58,8 +57,6 @@ namespace Parallax
                 m.SetTexture("_BiomeDisplacementPacked", dispPacked);
                 m.SetTexture("_BiomeInfluencePacked", inflPacked);
                 m.SetTexture("_BiomeOcclusionPacked", aoPacked);
-                m.SetTexture("_BiomeMask", mask);
-                m.SetTexture("_BiomeMask", Texture2D.redTexture);
                 m.SetFloatArray("_BiomeTiling", body.biomeTilingLive);
                 m.SetFloatArray("_BiomeDisplacementScale", body.biomeDispScaleLive);
                 m.SetFloatArray("_BiomeInfluenceStrength", body.biomeInflStrengthLive);

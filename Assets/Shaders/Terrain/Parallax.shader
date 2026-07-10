@@ -150,6 +150,7 @@ Shader "Custom/Parallax"
                 o.worldNormal = normalize(mul(unity_ObjectToWorld, v.normal).xyz);
                 o.viewDir = _WorldSpaceCameraPos - o.worldPos;
                 o.color = v.color;
+                o.biomeWeights = v.biomeWeights;
                 o.landMask = GetLandMask(o.worldPos, o.worldNormal);
                 return o;
             }
@@ -193,6 +194,7 @@ Shader "Custom/Parallax"
                 o.worldNormal = normalize(BARYCENTRIC_INTERPOLATE(worldNormal));
                 o.viewDir = BARYCENTRIC_INTERPOLATE(viewDir);
                 o.color = BARYCENTRIC_INTERPOLATE(color);
+                o.biomeWeights = BARYCENTRIC_INTERPOLATE(biomeWeights);
                 float4 landMask = BARYCENTRIC_INTERPOLATE(landMask);
 
                 float terrainDistance = length(o.viewDir);
@@ -281,15 +283,13 @@ Shader "Custom/Parallax"
                 fixed4 altitudeDiffuse = BLEND_TEXTURES(landMask, lowDiffuse, midDiffuse, highDiffuse);
                 NORMAL_FLOAT altitudeNormal = BLEND_TEXTURES(landMask, lowNormal, midNormal, highNormal);
     
+                float4 bMask = float4(0,0,0,0);
+                float4 bInf = float4(0,0,0,0);
                 #if defined (BIOME_LAYER) 
-                    uint _bw, _bh; _BiomeMask.GetDimensions(_bw, _bh);
-                    int2 _bpx = int2(saturate(BiomeMaskUV(i.worldPos)) * float2(_bw - 1, _bh - 1));
-
-                    float4 texMask  = _BiomeMask.Load(int3(_bpx, 0));
-                    float4 bMask    = texMask * ceil(saturate(_BiomeQuadMask));
+                    bMask = i.biomeWeights;
 
                     #if defined (INFLUENCE_MAPPING)
-                        float4 bInf = SampleBiplanarTextureObj(_BiomeInfluencePacked, sampler_TrilinearRepeat , params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+                        bInf = SampleBiplanarTextureObj(_BiomeInfluencePacked, sampler_TrilinearRepeat , params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
                     #endif
 
                     [unroll] for (int bi = 0; bi < 4; bi++)
@@ -499,6 +499,7 @@ Shader "Custom/Parallax"
                 o.viewDir = _WorldSpaceCameraPos - o.worldPos;
                 o.lightDir = _WorldSpaceLightPos0 - o.worldPos;
                 o.color = v.color;
+                o.biomeWeights = v.biomeWeights;
                 o.vertex = v.vertex;
                 o.landMask = GetLandMask(o.worldPos, o.worldNormal);
                 return o;
@@ -546,7 +547,7 @@ Shader "Custom/Parallax"
                 v.color = BARYCENTRIC_INTERPOLATE(color);
                 v.lightDir = BARYCENTRIC_INTERPOLATE(lightDir);
                 v.vertex = BARYCENTRIC_INTERPOLATE(vertex);
-                
+                v.biomeWeights = BARYCENTRIC_INTERPOLATE(biomeWeights);
                 float4 landMask = BARYCENTRIC_INTERPOLATE(landMask);
 
                 float terrainDistance = length(v.viewDir);
@@ -636,15 +637,13 @@ Shader "Custom/Parallax"
                 fixed4 altitudeDiffuse = BLEND_TEXTURES(landMask, lowDiffuse, midDiffuse, highDiffuse);
                 float3 altitudeNormal = BLEND_TEXTURES(landMask, lowNormal, midNormal, highNormal);
     
-                #if defined (BIOME_LAYER) 
-                    uint _bw, _bh; _BiomeMask.GetDimensions(_bw, _bh);
-                    int2 _bpx = int2(saturate(BiomeMaskUV(i.worldPos)) * float2(_bw - 1, _bh - 1));
-
-                    float4 texMask  = _BiomeMask.Load(int3(_bpx, 0));
-                    float4 bMask    = texMask * ceil(saturate(_BiomeQuadMask));
+                float4 bMask = float4(0,0,0,0);
+                float4 bInf = float4(0,0,0,0);
+                #if defined (BIOME_LAYER)
+                    bMask = i.biomeWeights;
 
                     #if defined (INFLUENCE_MAPPING)
-                        float4 bInf = SampleBiplanarTextureObj(_BiomeInfluencePacked, sampler_TrilinearRepeat , params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
+                        bInf = SampleBiplanarTextureObj(_BiomeInfluencePacked, sampler_TrilinearRepeat , params, worldUVsLevel0, worldUVsLevel1, i.worldNormal, texLevelBlend);
                     #endif
 
                     [unroll] for (int bi = 0; bi < 4; bi++)

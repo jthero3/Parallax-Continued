@@ -31,8 +31,6 @@ namespace Parallax
         public float quadWidth;
 
         private static readonly int[] BiomeCornerIdx = { 0, 14, 224, 210, 112 };
-        private static MaterialPropertyBlock _biomeMpb;
-        private static readonly int _BiomeQuadMaskID = Shader.PropertyToID("_BiomeQuadMask");
 
         float blendLowMidStart;
         float blendLowMidEnd;
@@ -66,7 +64,6 @@ namespace Parallax
             if (body.HasBiomeLayers && body.biomeMask != null && !quadMaterial.IsKeywordEnabled("BIOME_LAYER"))
             {
                 quadMaterial.EnableKeyword("BIOME_LAYER");
-                quadMaterial.SetTexture("_BiomeMask", body.biomeMask);
                 quadMaterial.SetTexture("_BiomeAlbedoArray", body.biomeAlbedoArr);
                 quadMaterial.SetTexture("_BiomeBumpArray", body.biomeBumpArr);
                 quadMaterial.SetTexture("_BiomeDisplacementPacked", body.biomeDispPacked);
