@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
-using KSPTextureLoader;   // 1.0.3 async texture loader
+using KSPTextureLoader;
 
 namespace Parallax
 {
     public static class BiomeLayerBuilder
     {
-        // Array standard. DXT5 (not BC7) because Texture2D.Compress only emits DXT at runtime.
         const int ALB_SIZE = 2048; const TextureFormat ALB_FMT = TextureFormat.DXT5;
         const int BMP_SIZE = 2048; const TextureFormat BMP_FMT = TextureFormat.DXT5;
         const int SCALAR_SIZE = 1024;
@@ -21,7 +20,6 @@ namespace Parallax
             int count = Array.FindLastIndex(byCh, l => l != null) + 1;
             if (count <= 0) return;
 
-            // 1) Kick off every texture load up front (async), then resolve below.
             Dictionary<string, TextureHandle> H = Preload(byCh);
 
             Texture2DArray albedoArr = BuildArray(byCh, count, H, l => l == null ? null : l.albedoPath, ALB_SIZE, ALB_FMT, true, false);
@@ -34,7 +32,6 @@ namespace Parallax
                 "GameData/ParallaxContinued/PluginData/BiomeMasks", body.planetName + "_layers.png");
             Texture2D mask = BiomeMaskBaker.BakeRGBA(cb, byCh, cache);
 
-            // NEW: stash on the body so per-quad Initialize() can bind them onto the shared quad material
             body.biomeAlbedoArr = albedoArr;
             body.biomeBumpArr = bumpArr;
             body.biomeDispPacked = dispPacked;
@@ -49,11 +46,10 @@ namespace Parallax
             body.biomeAoStrengthLive = Param(byCh, l => l.occlusionStrength, 0f);
             body.biomeEdgeNoiseLive = 0f;
 
-            Color[] px = mask.GetPixels();  // if readable; if not, skip
+            Color[] px = mask.GetPixels();
             int nonzero = 0; for (int i = 0; i < px.Length; i++) if (px[i].r > 0.5f) nonzero++;
             ParallaxDebug.Log("[BiomeLayer] mask red>0.5 pixels: " + nonzero + " / " + px.Length);
 
-            // 5) Bind onto all six variants + enable keyword
             foreach (Material m in Variants(body.parallaxMaterials))
             {
                 if (m == null) continue;
@@ -75,8 +71,6 @@ namespace Parallax
             }
             ParallaxDebug.Log("[BiomeLayer] " + body.planetName + ": " + count + " layer(s) bound");
         }
-
-        // --- texture loading (1.0.3 async API) ---
         static Dictionary<string, TextureHandle> Preload(BiomeLayer[] byCh)
         {
             var h = new Dictionary<string, TextureHandle>();
@@ -89,9 +83,9 @@ namespace Parallax
             foreach (BiomeLayer l in byCh)
             {
                 if (l == null) continue;
-                kick(l.albedoPath, false, true);    // array via CopyTexture/Blit -> GPU-only OK
+                kick(l.albedoPath, false, true);
                 kick(l.bumpPath, true, true);
-                kick(l.displacementPath, true, false);   // packed -> GetPixels needs readable
+                kick(l.displacementPath, true, false);
                 kick(l.influencePath, true, false);
                 kick(l.occlusionPath, true, false);
             }
@@ -101,11 +95,10 @@ namespace Parallax
         static Texture2D Resolve(Dictionary<string, TextureHandle> H, string path)
         {
             if (string.IsNullOrEmpty(path) || !H.TryGetValue(path, out TextureHandle handle)) return null;
-            try { return handle.GetTexture() as Texture2D; }   // blocks until ready
+            try { return handle.GetTexture() as Texture2D; }
             catch (Exception e) { ParallaxDebug.LogError("[BiomeLayer] load failed " + path); Debug.LogException(e); return null; }
         }
 
-        // RenderTexture blit -> readable RGBA32. Works on compressed/unreadable sources (blit samples on GPU).
         static Texture2D Normalize(Texture2D src, int size, bool mips, bool linear)
         {
             RenderTexture rt = RenderTexture.GetTemporary(size, size, 0, RenderTextureFormat.ARGB32,
@@ -130,14 +123,14 @@ namespace Parallax
             for (int i = 0; i < count; i++)
             {
                 Texture2D src = Resolve(H, path(byCh[i]));
-                if (src == null) continue;   // leaves a black slice; mask keeps it unused
+                if (src == null) continue;
                 if (src.width != size || src.height != size || src.format != fmt)
                 {
-                    Texture2D n = Normalize(src, size, mips, linear);   // RGBA32
-                    if (fmt != TextureFormat.RGBA32) n.Compress(true);  // RGBA32 always has alpha -> DXT5
+                    Texture2D n = Normalize(src, size, mips, linear);
+                    if (fmt != TextureFormat.RGBA32) n.Compress(true);
                     src = n;
                 }
-                Graphics.CopyTexture(src, 0, arr, i);                   // requires matching fmt+dims
+                Graphics.CopyTexture(src, 0, arr, i);
             }
             arr.Apply(false, true);
             return arr;

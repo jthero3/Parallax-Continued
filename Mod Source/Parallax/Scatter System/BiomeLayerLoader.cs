@@ -2,8 +2,6 @@
 
 namespace Parallax
 {
-    // PSystemSpawn guarantees CelestialBody.BiomeMap exists (ConfigLoader runs earlier at
-    // Startup.Instantly, before biome maps load), and the six materials already exist from LoadInitial.
     [KSPAddon(KSPAddon.Startup.PSystemSpawn, false)]
     public class BiomeLayerLoader : MonoBehaviour
     {
