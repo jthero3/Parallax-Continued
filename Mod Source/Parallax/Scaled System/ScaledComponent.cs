@@ -52,9 +52,12 @@ namespace Parallax.Scaled_System
             }
             else
             {
+                parentStar = Sun.Instance.sun;
                 ParallaxDebug.Log("Warning: Unable to find the parent star for: " + celestialBody.name);
-                ParallaxDebug.Log("Shadow penumbra angle will be defaulted");
+                ParallaxDebug.Log("Shadows will be cast from " + parentStar.name);
             }
+
+            Camera.onPreCull += OnCameraPreCull;
 
             // Kick off immediately
             Update();
@@ -62,7 +65,13 @@ namespace Parallax.Scaled_System
         void Update()
         {
             UpdateVisibility();
-            UpdateShadows();
+        }
+        void OnCameraPreCull(Camera cam)
+        {
+            if (ScaledCamera.Instance != null && cam == ScaledCamera.Instance.cam)
+            {
+                UpdateShadows();
+            }
         }
         void UpdateVisibility()
         {
@@ -117,6 +126,9 @@ namespace Parallax.Scaled_System
             float penumbraAngle = CalculateSubtendedAngle(celestialBody.transform.position, parentStar.transform.position, (float)parentStar.Radius);
 
             scaledBody.shadowCasterMaterial.SetFloat("_LightWidth", penumbraAngle);
+
+            Vector3 lightDirection = (parentStar.scaledBody.transform.position - celestialBody.scaledBody.transform.position).normalized;
+            scaledBody.shadowCasterMaterial.SetVector("_ShadowLightDirection", lightDirection);
         }
         /// <summary>
         /// Calculates the angle between origin-to-target and target-to-targetradius
@@ -127,7 +139,7 @@ namespace Parallax.Scaled_System
         /// <returns></returns>
         float CalculateSubtendedAngle(Vector3 origin, Vector3 target, float targetRadius)
         {
-            return Mathf.Atan2(targetRadius, (origin - target).magnitude) * 2.0f;
+            return Mathf.Atan2(targetRadius, (origin - target).magnitude);
         }
         float CalculateScreenSizePixels(Vector3 origin, Vector3 target, float radius, float fovDegrees)
         {
@@ -144,6 +156,10 @@ namespace Parallax.Scaled_System
         {
             ParallaxDebug.Log("Disabled " + celestialBody.bodyName);
             scaledBody?.Unload();
+        }
+        void OnDestroy()
+        {
+            Camera.onPreCull -= OnCameraPreCull;
         }
     }
 }

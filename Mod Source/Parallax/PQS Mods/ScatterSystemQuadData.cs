@@ -1,7 +1,4 @@
-﻿using Parallax.Legacy;
-using Parallax.PQS_Mods;
-using Parallax.Tools;
-using System;
+﻿using Parallax.PQS_Mods;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -39,7 +36,7 @@ namespace Parallax
         // Potentially store a scaled version of this to get closer to the desired frequency and reduce precision errors
         // Length parity with quad vertex count
         public Vector3[] directionsFromCenter;
-        public Texture2D blockMapData;
+        public MapSO blockMapData;
         public PQSMod_MapDecalVertexRemoveScatter blockMapPQSMod;   // Only assigned if we have a block map on this quad
 
         // Physical mesh data
@@ -204,12 +201,13 @@ namespace Parallax
         /// </summary>
         public void EvaluateQuad()
         {
-            foreach (ScatterData scatter in quadScatters)
+            for (int i = quadScatters.Count - 1; i >= 0; i--)
             {
-                float referenceDistance = scatter.scatter.useCraftPosition ? (float)(quad.gcDist) : cameraDistance;
+                ScatterData scatter = quadScatters[i];
+
                 // Scatter out of range and active? Pause
-                if (referenceDistance > scatter.scatter.distributionParams.range * scatter.scatter.distributionParams.range + sqrQuadWidth)
-                { 
+                if (!InRange(scatter.scatter))
+                {
                     if (!scatter.cleaned)
                     {
                         scatter.Pause();
@@ -280,17 +278,28 @@ namespace Parallax
             // Update camera distance to this quad
             UpdateQuadCameraDistance(ref RuntimeOperations.vectorCameraPos);
 
-            float referenceDistance = data.scatter.useCraftPosition ? (float)(quad.gcDist) : cameraDistance;
-            if (data.CollidersEligible() && referenceDistance > data.scatter.distributionParams.range * data.scatter.distributionParams.range + sqrQuadWidth)
+            bool needsColliders = data.scatter.collideable && quad.subdivision == quad.sphereRoot.maxLevel;
+            if (!needsColliders && !InRange(data.scatter))
             {
-                // We're out of range, and colliders won't be generated
                 data.Pause();
             }
             else
             {
-                // We're in range, or colliders will be generated
                 data.Start();
             }
+        }
+        public bool InRange(Scatter scatter)
+        {
+            float range = scatter.distributionParams.range;
+            return GetReferenceSqrDistance(scatter) <= range * range + sqrQuadWidth;
+        }
+        float GetReferenceSqrDistance(Scatter scatter)
+        {
+            if (scatter.useCraftPosition)
+            {
+                return ((Vector3)quad.meshRenderer.localToWorldMatrix.GetColumn(3) - RuntimeOperations.vectorCraftPos).sqrMagnitude;
+            }
+            return cameraDistance;
         }
         /// <summary>
         /// Is the scatter eligible to be added to process on this quad?

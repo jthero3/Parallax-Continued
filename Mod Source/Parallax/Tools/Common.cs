@@ -726,7 +726,7 @@ namespace Parallax
             shadowCasterMaterial.SetFloat("_MaxRayDistance", tangentDist);
 
             // Computed at runtime, but the default is computed from Kerbin's SMA around the Sun
-            shadowCasterMaterial.SetFloat("_LightWidth", 0.0384f);
+            shadowCasterMaterial.SetFloat("_LightWidth", 0.0192f);
 
             // Setup environment
             scaledMaterial.SetTexture("_Skybox", SkyboxControl.cubeMap);
@@ -1107,6 +1107,10 @@ namespace Parallax
         /// Population Multiplier before being scaled by the global settings
         /// </summary>
         public int originalPopulationMultiplier;
+        /// <summary>
+        /// Extra population multiplier from Sigma Dimensions rescaling, 0 when not rescaled
+        /// </summary>
+        public int rescalePopulationMultiplier;
     }
     public struct LOD
     {

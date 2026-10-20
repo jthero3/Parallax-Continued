@@ -1,13 +1,7 @@
 ﻿using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
-using static Parallax.PQSStartPatch;
 
-namespace Parallax
+namespace Parallax.Harmony_Patches
 {
     // PQS StartSphere() is called for every planet at the start of every scene. The planet that actually builds is called with force = true (and can be multiple times!)
     // We need a patch here to add an event that fires when the planet we are about to build is the planet we are actually on

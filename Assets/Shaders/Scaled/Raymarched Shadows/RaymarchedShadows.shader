@@ -23,6 +23,7 @@
         _DisableDisplacement("Disable Displacement", int) = 0
         _LightWidth("Light Width", Range(0.0001, 0.3)) = 0.05
         _MaxRayDistance("Max Ray Distace", Range(0.0001, 100000)) = 1
+        _ShadowLightDirection("Shadow Light Direction", VECTOR) = (0,1,0,0)
 
         // Comment out when compiling
         //_ScaledPlanetOpacity("Scaled planet opacity", Range(0, 1)) = 1
@@ -62,6 +63,9 @@
             float _OceanAltitude;
             float _MaxRayDistance;
 
+            // Direction to this planet's parent star
+            float3 _ShadowLightDirection;
+
             // Global integer - Set at runtime from settings
             int _ParallaxScaledShadowStepSize;
 
@@ -76,7 +80,7 @@
             {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
-                float3 normal : NORMAl;
+                float3 normal : NORMAL;
                 float4 tangent : TANGENT;
             };
         
@@ -190,16 +194,21 @@
                 // Shadow normal bias
                 float3 dhdx = ddx(i.worldPos);
                 float3 dhdy = ddy(i.worldPos);
-                float3 dhdz = -normalize(cross(dhdx, dhdy)) * (_MaxRadialAltitude - _MinRadialAltitude) * SHADOW_NORMAL_BIAS;
+                float3 geometricNormal = normalize(cross(dhdx, dhdy));
+
+                // The sign of ddy depends on the API's screen space convention (D3D vs OpenGL)
+                // Orient the normal away from the planet
+                geometricNormal = dot(geometricNormal, i.worldPos - origin) < 0 ? -geometricNormal : geometricNormal;
+                float3 dhdz = geometricNormal * (_MaxRadialAltitude - _MinRadialAltitude) * SHADOW_NORMAL_BIAS;
 
                 float3 rayPos = initialRayPos + dhdz;
-                float3 rayDir = normalize(_WorldSpaceLightPos0);
-                
+                float3 rayDir = normalize(_ShadowLightDirection);
+
                 float rayDistance = _MaxRayDistance;
                 float stepSize = rayDistance / float(_ParallaxScaledShadowStepSize);
 
                 float attenuation = 1.0f;
-                float t = 0.0001;
+                float t = 0.0f;
 
                 // Random noise offset, could use blue noise but this looks good enough, it's only visible at shadow edges and helps remove stepping
                 #if defined (BLUE_NOISE)
@@ -208,6 +217,7 @@
                     float noise = _BlueNoise.Sample(sampler_BlueNoise_point_repeat, (screenUV % 64) / 64);
                     noise = (noise + 1.618f * _FrameCount) % 1;
                     rayPos -= rayDir * noise * stepSize;
+                    t -= noise * stepSize;
 
                 #endif
 
@@ -215,15 +225,16 @@
                 for (int b = 0; b < _ParallaxScaledShadowStepSize; b++)
                 {
                     rayPos += rayDir * stepSize;
+                    t += stepSize;
 
                     // Get ray altitude and terrain height
                     float worldTerrainAltitude = GetTerrainHeightAt(rayPos, origin);
                     float worldRayAltitude = GetAltitudeAt(rayPos, origin);
 
-                    // Compute height difference between ray and terrain
-                    float h = (worldRayAltitude - worldTerrainAltitude);
+                    // Project the vertical clearance onto the plane perpendicular to the ray so h / t is the occluder's angle from the ray
+                    float upDotRay = dot(normalize(rayPos - origin), rayDir);
+                    float h = (worldRayAltitude - worldTerrainAltitude) * sqrt(saturate(1.0f - upDotRay * upDotRay));
                     attenuation = min(attenuation, h / (_LightWidth * t));
-                    t += stepSize;
 
                     // Stop when shadowed
                     if (attenuation < -1.0f)
@@ -288,7 +299,7 @@
             {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
-                float3 normal : NORMAl;
+                float3 normal : NORMAL;
                 float4 tangent : TANGENT;
             };
         

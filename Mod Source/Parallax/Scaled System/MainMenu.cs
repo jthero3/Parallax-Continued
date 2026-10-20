@@ -115,7 +115,7 @@ namespace Parallax.Scaled_System
 
             planetLight = GameObject.Find("PlanetLight").GetComponent<Light>();
             fillLight = GameObject.Find("FillLight").GetComponent<Light>();
-            mainCamera = Camera.main;
+            mainCamera = RuntimeOperations.MainCamera;
 
             MainMenu main = FindObjectOfType<MainMenu>();
             MainMenuEnvLogic logic = main.envLogic;
@@ -195,7 +195,7 @@ namespace Parallax.Scaled_System
             }
             else
             {
-                mainCamera.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, shadowCommandBuffer);
+                mainCamera.AddCommandBuffer(CameraEvent.AfterDepthTexture, shadowCommandBuffer);
             }
 
             // Set up RT descs
@@ -339,7 +339,7 @@ namespace Parallax.Scaled_System
             body.shadowCasterMaterial.SetFloat("_MaxRayDistance", tangentDist);
 
             // Computed at runtime, but the default is computed from Kerbin's SMA around the Sun
-            body.shadowCasterMaterial.SetFloat("_LightWidth", 0.0384f);
+            body.shadowCasterMaterial.SetFloat("_LightWidth", 0.0192f);
 
             // Setup environment
             scaledMaterial.SetTexture("_Skybox", SkyboxControl.cubeMap);
@@ -369,8 +369,9 @@ namespace Parallax.Scaled_System
             shadowCommandBuffer.ClearRenderTarget(true, true, Color.white);
 
             // Only render what we can see and is loaded
-            shadowCommandBuffer.SetGlobalMatrix("_WorldRotation", Matrix4x4.Inverse(Matrix4x4.Rotate(meshRenderer.localToWorldMatrix.rotation)));
-            shadowCommandBuffer.DrawRenderer(meshRenderer, mainMenuBody.shadowCasterMaterial, 0);
+            mainMenuBody.shadowCasterMaterial.SetVector("_ShadowLightDirection", -fillLight.transform.forward);
+
+            shadowCommandBuffer.DrawRenderer(meshRenderer, mainMenuBody.shadowCasterMaterial, 0, 0);
 
             // Set planet opacity
             shadowCommandBuffer.SetGlobalFloat("_ScaledPlanetOpacity", 1.0f);
@@ -485,7 +486,8 @@ namespace Parallax.Scaled_System
             UnityEngine.Object.Destroy(scaledMaterial);
             UnityEngine.Object.Destroy(blueNoiseTexture);
 
-            if (!ConfigLoader.parallaxGlobalSettings.scaledGlobalSettings.scaledSpaceShadows)
+            // Shadows are only set up if Init found a planet and the scene's camera and light can be destroyed before we are
+            if (shadowCommandBuffer == null)
             {
                 return;
             }
@@ -496,16 +498,22 @@ namespace Parallax.Scaled_System
             }
             else if (mainCamera != null)
             {
-                mainCamera.RemoveCommandBuffer(CameraEvent.BeforeForwardOpaque, shadowCommandBuffer);
+                mainCamera.RemoveCommandBuffer(CameraEvent.AfterDepthTexture, shadowCommandBuffer);
             }
 
-            fillLight?.RemoveCommandBuffer(LightEvent.AfterScreenspaceMask, lightCommandBuffer);
+            if (fillLight != null)
+            {
+                fillLight.RemoveCommandBuffer(LightEvent.AfterScreenspaceMask, lightCommandBuffer);
+            }
 
             lightCommandBuffer.Dispose();
             shadowCommandBuffer.Dispose();
             shadowAttenuationRT.Release();
             shadowDistanceRT.Release();
             shadowObjectDepthRT.Release();
+
+            lightCommandBuffer = null;
+            shadowCommandBuffer = null;
         }
     }
 }

@@ -2,8 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Parallax.LateCompatibility
@@ -13,12 +11,66 @@ namespace Parallax.LateCompatibility
     /// </summary>
 
     [KSPAddon(KSPAddon.Startup.MainMenu, true)]
-    class LateCompatibility : MonoBehaviour
+    public class SigmaDimensions : MonoBehaviour
     {
         public void Start()
         {
             RunCompatibility_SigmaDimensions();
         }
+
+        /// <summary>
+        /// Number of PQS subdivision levels to add so max level quads stay close to their unscaled size
+        /// </summary>
+        public static int GetMaxLevelRaise(float resizeValue)
+        {
+            return Mathf.RoundToInt(Mathf.Log(resizeValue, 2f));
+        }
+
+        /// <summary>
+        /// Corrects scatter density for the leftover difference in quad area after raising the max level, between 0.5 and 2
+        /// </summary>
+        public static float GetDensityMultiplier(float resizeValue)
+        {
+            return resizeValue * resizeValue / Mathf.Pow(4f, GetMaxLevelRaise(resizeValue));
+        }
+
+        // PQS StartSphere reads maxLevel from these presets on every scene load so we need to update them first
+        static void FixupPQSPresets()
+        {
+            HashSet<string> parallaxBodies = new HashSet<string>(ConfigLoader.parallaxTerrainBodies.Keys.Concat(ConfigLoader.parallaxScatterBodies.Keys));
+            foreach (string bodyName in parallaxBodies)
+            {
+                CelestialBody cb = FlightGlobals.GetBodyByName(bodyName);
+                if (cb == null || cb.pqsController == null)
+                {
+                    continue;
+                }
+
+                int maxLevelRaise = GetMaxLevelRaise((float)cb.Get<double>("resize"));
+                if (maxLevelRaise == 0)
+                {
+                    continue;
+                }
+
+                // Includes the ocean sphere, which has its own preset
+                foreach (PQS pqs in cb.pqsController.GetComponentsInChildren<PQS>(true))
+                {
+                    foreach (PQSCache.PQSPreset qualityPreset in PQSCache.PresetList.presets)
+                    {
+                        foreach (PQSCache.PQSSpherePreset spherePreset in qualityPreset.spherePresets)
+                        {
+                            if (spherePreset.name == pqs.name)
+                            {
+                                spherePreset.maxSubdivision = Math.Max(spherePreset.maxSubdivision + maxLevelRaise, 1);
+                            }
+                        }
+                    }
+                }
+
+                ParallaxDebug.Log("[SigmaDimensions Compatibility] Raised PQS max level for " + bodyName + " by " + maxLevelRaise);
+            }
+        }
+
         public void RunCompatibility_SigmaDimensions()
         {
             UrlDir.UrlConfig sigDimConfig = ConfigLoader.GetConfigByName("SigmaDimensions");
@@ -32,7 +84,7 @@ namespace Parallax.LateCompatibility
                 ParallaxDebug.Log("Sigma Dimensions detected, applying rescale values");
             }
 
-            ConfigNode sigmaDimensionsNode = sigDimConfig.config;
+            FixupPQSPresets();
 
             foreach (ParallaxScaledBody scaledBody in ConfigLoader.parallaxScaledBodies.Values)
             {
@@ -75,22 +127,7 @@ namespace Parallax.LateCompatibility
                 terrainBody.terrainShaderProperties.shaderFloats["_MidHighBlendStart"] *= resizeValue * landscapeValue;
                 terrainBody.terrainShaderProperties.shaderFloats["_MidHighBlendEnd"] *= resizeValue * landscapeValue;
 
-                // Adjust subdivision settings
-                PQSMod_Parallax parallaxPQSMod = (PQSMod_Parallax)cb.pqsController.mods.FirstOrDefault(mod => mod.GetType() == typeof(PQSMod_Parallax));
-                
-                // Subdiv level scales with log2(area) so just add 1 per power of 2 scale to the parallaxPQSMod.subdivisionLevel
-                if (parallaxPQSMod != null)
-                {
-                    // Don't care about landscape value because that just scales altitude
-                    // Plus 1 because subdivLevel is proportional to area
-                    parallaxPQSMod.subdivisionLevel += Mathf.CeilToInt(Mathf.Log(resizeValue + 1, 2));
-                    parallaxPQSMod.subdivisionRadius *= resizeValue;
-
-                    // Unlikely to reach 14 but it gets slow if it does
-                    // Fwiw rescale of 10 will only add 4, and Tylo uses the most at a depth of 9, so we'll hit 13.
-                    parallaxPQSMod.subdivisionLevel = Mathf.Min(parallaxPQSMod.subdivisionLevel, 14);
-                }
-
+                // Tessellation settings are left alone because the raised PQS max level keeps quads at their unscaled size
                 terrainBody.SetMaterialValues();
             }
 
@@ -99,21 +136,26 @@ namespace Parallax.LateCompatibility
                 CelestialBody cb = FlightGlobals.GetBodyByName(scatterBody.planetName);
                 float resizeValue = (float)cb.Get<double>("resize");
                 float landscapeValue = (float)cb.Get<double>("landscape");
+                float densityMultiplier = GetDensityMultiplier(resizeValue);
 
                 foreach (Scatter scatter in scatterBody.fastScatters)
                 {
                     scatter.distributionParams.minAltitude *= resizeValue * landscapeValue;
                     scatter.distributionParams.maxAltitude *= resizeValue * landscapeValue;
 
-                    // Don't care about landscape value because that just scales altitude
-                    // Limit density scalar to 5.5x scale - anything after that we take the density losses to conserve RAM (would be 100x at 10x scale)
-                    float densityScalar = resizeValue;
-                    densityScalar = Mathf.Min(densityScalar, 5.5f);
-
-                    // Now scale density appropriately
-                    // Pop mult scales with square of rescale factor - Floor to be conservative, 
-                    scatter.distributionParams.populationMultiplier *= Mathf.FloorToInt(densityScalar * densityScalar);
-                    scatter.distributionParams.populationMultiplier = Mathf.Max(scatter.distributionParams.populationMultiplier, 1);
+                    // Spawn chance is a probability, so it saturates at 1 and anything above that after scaling moves into the population multiplier
+                    if (densityMultiplier != 1)
+                    {
+                        scatter.distributionParams.spawnChance = Mathf.Min(scatter.distributionParams.spawnChance, 1) * densityMultiplier;
+                        if (scatter.distributionParams.spawnChance > 1)
+                        {
+                            // Stored so global density changes in the GUI can reapply it
+                            int populationScale = Mathf.CeilToInt(scatter.distributionParams.spawnChance);
+                            scatter.distributionParams.rescalePopulationMultiplier = populationScale;
+                            scatter.distributionParams.populationMultiplier *= populationScale;
+                            scatter.distributionParams.spawnChance /= populationScale;
+                        }
+                    }
 
                     // Adjust distribution noise frequency
                     scatter.noiseParams.frequency *= resizeValue;
